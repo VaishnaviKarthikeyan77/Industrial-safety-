@@ -1,0 +1,92 @@
+import time
+import random
+import threading
+from queue import Queue
+
+# AI model for hazard detection
+def detect_hazard(temperature, pressure):
+    # Placeholder for AI model implementation
+    if temperature > 40 or pressure > 1100:
+        return True
+    else:
+        return False
+
+# User interface function
+def user_interface(input_queue):
+    print("Industrial Safety Monitoring System")
+    print("-----------------------------------")
+    while True:
+        print("\nMenu:")
+        print("1. Monitor Safety Status")
+        print("2. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == "1":
+            temperature, pressure = generate_sensor_data()
+            input_queue.put((temperature, pressure))
+            print("\nMonitoring safety status...")
+        elif choice == "2":
+            print("Exiting...")
+            input_queue.put(None)
+            break
+        else:
+            print("Invalid choice. Please enter a valid option.")
+
+# Function to generate sensor data
+def generate_sensor_data():
+    temperature = random.uniform(20, 50)
+    pressure = random.uniform(800, 1200)
+    return temperature, pressure
+
+# Worker function for processing sensor data
+def data_processing_worker(input_queue, output_queue):
+    while True:
+        data = input_queue.get()  # Get data from input queue
+        if data is None:
+            break  # Exit thread if None is received
+        temperature, pressure = data
+        hazard_detected = detect_hazard(temperature, pressure)
+        output_queue.put(hazard_detected)  # Put result into output queue
+
+# Function to send alert
+def send_alert(hazard_detected):
+    if hazard_detected:
+        print("Safety hazard detected! Alerting relevant personnel.")
+
+# Main function
+def main():
+    # Create input and output queues for data processing workers
+    input_queue = Queue()
+    output_queue = Queue()
+
+    # Start data processing worker threads
+    num_workers = 4  # Adjust based on system resources
+    workers = []
+    for _ in range(num_workers):
+        worker = threading.Thread(target=data_processing_worker, args=(input_queue, output_queue))
+        worker.start()
+        workers.append(worker)
+
+    try:
+        # Start user interface in a separate thread
+        ui_thread = threading.Thread(target=user_interface, args=(input_queue,))
+        ui_thread.start()
+
+        while True:
+            # Get result from output queue (blocks until result is available)
+            hazard_detected = output_queue.get()
+
+            # Send alert if hazard detected
+            send_alert(hazard_detected)
+
+    except KeyboardInterrupt:
+        print("Exiting...")
+        # Signal data processing workers to exit
+        for _ in range(num_workers):
+            input_queue.put(None)
+        # Wait for worker threads to finish
+        for worker in workers:
+            worker.join()
+
+if __name__ == "__main__":
+    main()
